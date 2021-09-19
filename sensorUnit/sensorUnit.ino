@@ -59,12 +59,12 @@ void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
   Serial.print("Last Packet Send Status: ");
   Serial.println(status == ESP_NOW_SEND_SUCCESS ? "Delivery Success" : "Delivery Fail");
   // 画面にも描画
-  M5.Lcd.fillScreen(BLACK);
-  M5.Lcd.setCursor(0, 0);
-  M5.Lcd.print("Last Packet Sent to: \n  ");
-  M5.Lcd.println(macStr);
-  M5.Lcd.print("Last Packet Send Status: \n  ");
-  M5.Lcd.println(status == ESP_NOW_SEND_SUCCESS ? "Delivery Success" : "Delivery Fail");
+  //M5.Lcd.fillScreen(BLACK);
+  //M5.Lcd.setCursor(0, 0);
+  //M5.Lcd.print("Last Packet Sent to: \n  ");
+  //M5.Lcd.println(macStr);
+  //M5.Lcd.print("Last Packet Send Status: \n  ");
+  //M5.Lcd.println(status == ESP_NOW_SEND_SUCCESS ? "Delivery Success" : "Delivery Fail");
 }
 
 void setup()
@@ -164,6 +164,27 @@ void loop()
   M5.Lcd.printf("TVOC:%4dppb\n", sgp.TVOC);
   M5.Lcd.printf("eCO2:%4dppm\n", sgp.eCO2);
 
+  uint8_t tmpUpper = (uint8_t)tmp;
+  uint8_t tmpLower = (uint8_t)((tmp - (float)tmpUpper) * 100);
+  uint8_t humUpper = (uint8_t)hum;
+  uint8_t humLower = (uint8_t)((hum - (float)humUpper) * 100);
+  uint8_t tvocUpper = (uint8_t)(sgp.TVOC >> 8);
+  uint8_t tvocLower = (uint8_t)(sgp.TVOC & 0xff);
+  uint8_t eco2Upper = (uint8_t)(sgp.eCO2 >> 8);
+  uint8_t eco2Lower = (uint8_t)(sgp.eCO2 & 0xff);
+  
+  uint8_t data[8] = {
+    tmpUpper,
+    tmpLower,
+    humUpper,
+    humLower,
+    tvocUpper,
+    tvocLower,
+    eco2Upper,
+    eco2Lower,
+    };
+    esp_err_t result = esp_now_send(slave.peer_addr, data, sizeof(data));
+
   // ボタンを押された場合はDeviceNumberを変更
   if(M5.BtnB.wasPressed()){
     Serial.println("ButtonB pressed");
@@ -171,6 +192,7 @@ void loop()
   }
 
   // ボタンを押したら送信
+  /*
   if ( M5.BtnA.wasPressed() ) {
     uint8_t data[2] = {123, 234};
     esp_err_t result = esp_now_send(slave.peer_addr, data, sizeof(data));
@@ -191,5 +213,5 @@ void loop()
       Serial.println("Not sure what happened");
     }
   }
-  
+  */
 }
