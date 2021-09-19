@@ -58,13 +58,6 @@ void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
   Serial.println(macStr);
   Serial.print("Last Packet Send Status: ");
   Serial.println(status == ESP_NOW_SEND_SUCCESS ? "Delivery Success" : "Delivery Fail");
-  // 画面にも描画
-  //M5.Lcd.fillScreen(BLACK);
-  //M5.Lcd.setCursor(0, 0);
-  //M5.Lcd.print("Last Packet Sent to: \n  ");
-  //M5.Lcd.println(macStr);
-  //M5.Lcd.print("Last Packet Send Status: \n  ");
-  //M5.Lcd.println(status == ESP_NOW_SEND_SUCCESS ? "Delivery Success" : "Delivery Fail");
 }
 
 void setup()
@@ -173,7 +166,8 @@ void loop()
   uint8_t eco2Upper = (uint8_t)(sgp.eCO2 >> 8);
   uint8_t eco2Lower = (uint8_t)(sgp.eCO2 & 0xff);
   
-  uint8_t data[8] = {
+  uint8_t data[9] = {
+    deviceNumber,
     tmpUpper,
     tmpLower,
     humUpper,
@@ -190,28 +184,4 @@ void loop()
     Serial.println("ButtonB pressed");
     countUpDeviceNumber();
   }
-
-  // ボタンを押したら送信
-  /*
-  if ( M5.BtnA.wasPressed() ) {
-    uint8_t data[2] = {123, 234};
-    esp_err_t result = esp_now_send(slave.peer_addr, data, sizeof(data));
-    Serial.print("Send Status: ");
-    if (result == ESP_OK) {
-      Serial.println("Success");
-    } else if (result == ESP_ERR_ESPNOW_NOT_INIT) {
-      Serial.println("ESPNOW not Init.");
-    } else if (result == ESP_ERR_ESPNOW_ARG) {
-      Serial.println("Invalid Argument");
-    } else if (result == ESP_ERR_ESPNOW_INTERNAL) {
-      Serial.println("Internal Error");
-    } else if (result == ESP_ERR_ESPNOW_NO_MEM) {
-      Serial.println("ESP_ERR_ESPNOW_NO_MEM");
-    } else if (result == ESP_ERR_ESPNOW_NOT_FOUND) {
-      Serial.println("Peer not found.");
-    } else {
-      Serial.println("Not sure what happened");
-    }
-  }
-  */
 }
