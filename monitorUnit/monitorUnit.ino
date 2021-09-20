@@ -10,7 +10,7 @@ esp_now_peer_info_t slave;
 #define UPDATE_DISP_INTERVAL_MSEC  5000
 #define UPDATE_DATAUPLOAD_INTERVAL_MSEC  60000 // 1分に1回書く
 #define MAX(a,b) ((a)>(b)?(a):(b))
-int interval_counter = 0;
+int interval_counter = 1;
 
 //device
 #define DEVICE_NUMBER_MIN 1
