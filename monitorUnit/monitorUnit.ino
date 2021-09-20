@@ -7,12 +7,21 @@
 
 esp_now_peer_info_t slave;
 
-#define UPDATE_INTERVAL_MSEC  5000
+#define UPDATE_DISP_INTERVAL_MSEC  5000
+#define UPDATE_DATAUPLOAD_INTERVAL_MSEC  60000 // 1分に1回書く
+#define MAX(a,b) ((a)>(b)?(a):(b))
 int interval_counter = 0;
 
 //device
 #define DEVICE_NUMBER_MIN 1
 #define DEVICE_NUMBER_MAX 4
+
+#define SENSOR_TAG_MAX 5
+#define SENSOR_TAG_TMP  1
+#define SENSOR_TAG_HUMI  2
+#define SENSOR_TAG_PRESSURE  3
+#define SENSOR_TAG_TVOC  4
+#define SENSOR_TAG_ECO2  5
 
 struct deviceInfo
 {
@@ -109,6 +118,85 @@ static int resetSipfModule()
   return 0;
 }
 
+static void DispDeviceInfo()
+{
+  M5.Lcd.setCursor(0, 0);
+  {
+    int i = 0;
+    for(i = 0;i < DEVICE_NUMBER_MAX;i=i+2)
+    {
+      M5.Lcd.setTextColor(WHITE, BLACK);
+      M5.Lcd.printf("DvNo|    %d    |     %d\n",i+1,i+2);
+      M5.Lcd.printf("----+---------+-----------\n");
+      M5.Lcd.printf("Temp| %02.2fC  | %02.2fC\n",devInfo[i].tmp,devInfo[i+1].tmp);
+      M5.Lcd.printf("Humi| %02.2f%%  | %02.2f%%\n",devInfo[i].humi,devInfo[i+1].humi);
+      M5.Lcd.printf("TVOC|  %4dppb|  %4dppb\n", devInfo[i].tvoc,devInfo[i+1].tvoc);
+      M5.Lcd.printf("eCO2|  %4dppm|  %4dppb\n", devInfo[i].eco2,devInfo[i+1].eco2);
+      M5.Lcd.printf("\n");
+    }
+  }
+}
+
+static void sendDeviceInfoToSipf()
+{
+  int devIndex = 0;
+
+  for(devIndex = 0;devIndex < DEVICE_NUMBER_MAX;devIndex=devIndex+1){
+    int devNumber = devIndex + 1;
+    int sensorTagIndex = 0;
+
+    for(sensorTagIndex = 0;sensorTagIndex < SENSOR_TAG_MAX;sensorTagIndex=sensorTagIndex+1){
+      int sensorTagNumber = sensorTagIndex + 1;
+      int sendTag = (devNumber << 4) | sensorTagNumber;
+      SimpObjTypeId sendObjType=OBJ_TYPE_UINT8;
+      uint8_t *sendData;
+      int sendDataLen = 0;
+      bool tagError = false;
+      
+      switch(sensorTagNumber){
+       case  SENSOR_TAG_TMP:
+        sendObjType = OBJ_TYPE_FLOAT64;
+        sendData = (uint8_t *)&(devInfo[devIndex].tmp);
+        sendDataLen = sizeof(double);
+        break;
+       case  SENSOR_TAG_HUMI:
+        sendObjType = OBJ_TYPE_FLOAT64;
+        sendData = (uint8_t *)&(devInfo[devIndex].humi);
+        sendDataLen = sizeof(double);
+        break;
+       case  SENSOR_TAG_PRESSURE:
+        sendObjType = OBJ_TYPE_FLOAT64;
+        sendData = (uint8_t *)&(devInfo[devIndex].pressure);
+        sendDataLen = sizeof(double);
+        break;
+       case SENSOR_TAG_TVOC:
+        sendObjType = OBJ_TYPE_UINT32;
+        sendData = (uint8_t *)&(devInfo[devIndex].tvoc);
+        sendDataLen = sizeof(int);
+        break;
+       case SENSOR_TAG_ECO2:
+        sendObjType = OBJ_TYPE_UINT32;
+        sendData = (uint8_t *)&(devInfo[devIndex].eco2);
+        sendDataLen = sizeof(int);
+        break;
+       default:
+        tagError = true;
+        break;
+      }
+
+      if(tagError == false){
+        memset(buff, 0, sizeof(buff));
+        int ret = SipfCmdTx(sendTag, sendObjType, sendData, sendDataLen, buff);
+        if (ret == 0) {
+          Serial.printf("OK\nOTID: %s\n", buff);
+        } else {
+          Serial.printf("NG: %d\n", ret);
+        }
+      }
+    }
+  }
+}
+
 void setup()
 {
   // serial
@@ -168,36 +256,27 @@ void loop()
 {
   M5.update();
 
-  if(interval_counter > UPDATE_INTERVAL_MSEC){
-    interval_counter = 0;
-    
-    M5.Lcd.setCursor(0, 0);
-    {
-      int i = 0;
-      for(i = 0;i < DEVICE_NUMBER_MAX;i=i+2)
-      {
-        M5.Lcd.setTextColor(WHITE, BLACK);
-        M5.Lcd.printf("DvNo|    %d    |     %d\n",i+1,i+2);
-        M5.Lcd.printf("----+---------+-----------\n");
-        M5.Lcd.printf("Temp| %02.2fC  | %02.2fC\n",devInfo[i].tmp,devInfo[i+1].tmp);
-        M5.Lcd.printf("Humi| %02.2f%%  | %02.2f%%\n",devInfo[i].humi,devInfo[i+1].humi);
-        M5.Lcd.printf("TVOC|  %4dppb|  %4dppb\n", devInfo[i].tvoc,devInfo[i+1].tvoc);
-        M5.Lcd.printf("eCO2|  %4dppm|  %4dppb\n", devInfo[i].eco2,devInfo[i+1].eco2);
-        M5.Lcd.printf("\n");
-      }
-       
-      memset(buff, 0, sizeof(buff));
-      uint8_t test = 2;
-      int ret = SipfCmdTx(0x01, OBJ_TYPE_UINT32, &test, 4, buff);
-      if (ret == 0) {
-        Serial.printf("OK\nOTID: %s\n", buff);
-      } else {
-        Serial.printf("NG: %d\n", ret);
-      }
-    }
+  // ディスプレイタイマー満了
+  if((interval_counter % UPDATE_DISP_INTERVAL_MSEC) == 0)
+  {
+    DispDeviceInfo();
+  }
+  
+  // データアップロードタイマー満了
+  if((interval_counter % UPDATE_DATAUPLOAD_INTERVAL_MSEC) == 0)
+  {
+    sendDeviceInfoToSipf();
   }
 
+  // カウンターのリセット
+  if(interval_counter > MAX(UPDATE_DISP_INTERVAL_MSEC,UPDATE_DATAUPLOAD_INTERVAL_MSEC))
+  {
+    Serial.printf("reset!! %d", interval_counter);
+    interval_counter = 0;
+  }
+  
   interval_counter = interval_counter + 1;
+  
   delay(1);
 
   // ----------------------option?
