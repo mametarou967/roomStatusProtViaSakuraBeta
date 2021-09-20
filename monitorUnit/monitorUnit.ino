@@ -9,37 +9,43 @@ esp_now_peer_info_t slave;
 //device
 #define DEVICE_NUMBER_MIN 1
 #define DEVICE_NUMBER_MAX 4
+
 struct deviceInfo
 {
   double tmp;
   double humi;
+  double pressure;
   int tvoc;
   int eco2;
 };
 struct deviceInfo devInfo[DEVICE_NUMBER_MAX] = {0};
 
-// 受信コールバック
+// esp-now 受信コールバック
 void OnDataRecv(const uint8_t *mac_addr, const uint8_t *data, int data_len) {
   char macStr[18];
   snprintf(macStr, sizeof(macStr), "%02X:%02X:%02X:%02X:%02X:%02X",
            mac_addr[0], mac_addr[1], mac_addr[2], mac_addr[3], mac_addr[4], mac_addr[5]);
   Serial.printf("Last Packet Recv from: %s\n", macStr);
-  Serial.printf("Last Packet Recv Data(%d): ", data_len);
-  for ( int i = 0 ; i < data_len ; i++ ) {
-    Serial.print(data[i]);
-    Serial.print(" ");
-  }
-  Serial.println("");
 
   int deviceNumber = data[0];
   double tempValue = (double)data[1] + ((double)data[2] * 0.01);
   double humiValue = (double)data[3] + ((double)data[4] * 0.01);
-  int tvocValue = (data[5] << 8) + data[6];
-  int eco2Value = (data[7] << 8) + data[8];
-  
+  double pressureValue = ((double)data[5] * 100) + (double)data[6] + ((double)data[7] * 0.01);
+  int tvocValue = (data[8] * 100) + data[9];
+  int eco2Value = (data[10] * 100) + data[11];
+
+  Serial.printf("DvNo:%d ",deviceNumber);
+  Serial.printf("Temp:%2.2lfC ", tempValue);
+  Serial.printf("Humi:%2.2lf%% ", humiValue);
+  Serial.printf("pressure:%4.2lfPa ", pressureValue);
+  Serial.printf("TVOC:%4dppb ", tvocValue);
+  Serial.printf("eCO2:%4dppm\n", eco2Value);
+
+  // 画面表示用/データ送信用のデータ更新
   if((deviceNumber >=  DEVICE_NUMBER_MIN) && (deviceNumber <=  DEVICE_NUMBER_MAX)){
     devInfo[deviceNumber-1].tmp = tempValue;
     devInfo[deviceNumber-1].humi = humiValue;
+    devInfo[deviceNumber-1].pressure = pressureValue;
     devInfo[deviceNumber-1].tvoc = tvocValue;
     devInfo[deviceNumber-1].eco2 = eco2Value;
   }

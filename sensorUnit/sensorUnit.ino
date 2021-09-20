@@ -12,22 +12,17 @@ esp_now_peer_info_t slave;
 #define EEPROM_SIZE 64
 #define DEVICE_NUMBER_ADDRESS 1
 
-// ENV 2
-Adafruit_SHT31 sht3x = Adafruit_SHT31(&Wire);
-Adafruit_BMP280 bme = Adafruit_BMP280(&Wire);
-float tmp = 0.0;
-float hum = 0.0;
-float pressure = 0.0;
-
-// SGP30
-Adafruit_SGP30 sgp;
-int i = 15;
-long last_millis = 0;
-
 // device
 int deviceNumber = 1;
 #define DEVICE_NUMBER_MIN 1
 #define DEVICE_NUMBER_MAX 4
+
+// ENV 2
+Adafruit_SHT31 sht3x = Adafruit_SHT31(&Wire);
+Adafruit_BMP280 bme = Adafruit_BMP280(&Wire);
+
+// SGP30
+Adafruit_SGP30 sgp;
 
 void readDeviceNumber()
 {
@@ -49,7 +44,7 @@ void countUpDeviceNumber()
   EEPROM.commit();
 }
 
-// 送信コールバック
+// esp-now 送信コールバック
 void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
   char macStr[18];
   snprintf(macStr, sizeof(macStr), "%02X:%02X:%02X:%02X:%02X:%02X",
@@ -131,24 +126,16 @@ void setup()
 
 void loop()
 {
-  while(i > 0) {    
-    if(millis()- last_millis > 1000) {
-      last_millis = millis();
-      i--;
-    }
-  }
-  
-  delay(1000);
   M5.update();
 
   // 各値の取得
-  pressure = bme.readPressure();
-  tmp = sht3x.readTemperature();
-  hum = sht3x.readHumidity();
+  float tmp = sht3x.readTemperature();
+  float hum = sht3x.readHumidity();
+  float pressure = ( bme.readPressure() / 100);
   sgp.IAQmeasure();
 
   // 表示の更新
-  Serial.printf("Temperatura: %2.2f*C  Humedad: %0.2f%%  Pressure: %0.2fhPa Tvoc:%dppb eCo2:c%dppm \r\n", tmp, hum, pressure / 100,sgp.TVOC,sgp.eCO2);
+  Serial.printf("Temperatura: %2.2f*C  Humedad: %0.2f%%  Pressure: %0.2fhPa Tvoc:%dppb eCo2:%dppm \r\n", tmp, hum, pressure,sgp.TVOC,sgp.eCO2);
   M5.Lcd.setCursor(0, 0);
   M5.Lcd.setTextColor(WHITE, BLACK);
   M5.Lcd.printf("DvNo:%d\n",deviceNumber);
@@ -161,17 +148,23 @@ void loop()
   uint8_t tmpLower = (uint8_t)((tmp - (float)tmpUpper) * 100);
   uint8_t humUpper = (uint8_t)hum;
   uint8_t humLower = (uint8_t)((hum - (float)humUpper) * 100);
-  uint8_t tvocUpper = (uint8_t)(sgp.TVOC >> 8);
-  uint8_t tvocLower = (uint8_t)(sgp.TVOC & 0xff);
-  uint8_t eco2Upper = (uint8_t)(sgp.eCO2 >> 8);
-  uint8_t eco2Lower = (uint8_t)(sgp.eCO2 & 0xff);
+  uint8_t pressureUpper1 = (uint8_t)(((int)pressure) / 100);
+  uint8_t pressureUpper2 = (uint8_t)(((int)pressure) % 100);
+  uint8_t pressureLower = (uint8_t)((pressure - (int)pressure) * 100);
+  uint8_t tvocUpper = (uint8_t)(sgp.TVOC / 100);
+  uint8_t tvocLower = (uint8_t)(sgp.TVOC % 100);
+  uint8_t eco2Upper = (uint8_t)(sgp.eCO2 / 100);
+  uint8_t eco2Lower = (uint8_t)(sgp.eCO2 % 100);
   
-  uint8_t data[9] = {
+  uint8_t data[12] = {
     deviceNumber,
     tmpUpper,
     tmpLower,
     humUpper,
     humLower,
+    pressureUpper1,
+    pressureUpper2,
+    pressureLower,
     tvocUpper,
     tvocLower,
     eco2Upper,
@@ -184,4 +177,6 @@ void loop()
     Serial.println("ButtonB pressed");
     countUpDeviceNumber();
   }
+  
+  delay(1000);
 }
