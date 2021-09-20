@@ -4,8 +4,6 @@
 
 esp_now_peer_info_t slave;
 
-#define N 1024
-
 //device
 #define DEVICE_NUMBER_MIN 1
 #define DEVICE_NUMBER_MAX 4
@@ -87,7 +85,6 @@ void setup()
 
 void loop()
 {
-  delay(5000);
   M5.update();
   
   M5.Lcd.setCursor(0, 0);
@@ -105,4 +102,6 @@ void loop()
       M5.Lcd.printf("\n");
     }
   }
+  
+  delay(5000);
 }
