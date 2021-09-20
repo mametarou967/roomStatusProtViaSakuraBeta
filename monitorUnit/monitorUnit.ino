@@ -1,8 +1,14 @@
+#include <Arduino.h>
 #include "M5Stack.h"
 #include <esp_now.h>
 #include "WiFi.h"
+#include <string.h>
+#include "sipf_client.h"
 
 esp_now_peer_info_t slave;
+
+#define UPDATE_INTERVAL_MSEC  5000
+int interval_counter = 0;
 
 //device
 #define DEVICE_NUMBER_MIN 1
@@ -49,6 +55,60 @@ void OnDataRecv(const uint8_t *mac_addr, const uint8_t *data, int data_len) {
   }
 }
 
+
+/**
+ * SIPF接続情報
+ */
+static uint8_t buff[256];
+
+static int resetSipfModule()
+{
+  digitalWrite(5, LOW);
+  pinMode(5, OUTPUT);
+
+  // Reset要求
+  digitalWrite(5, HIGH);
+  delay(10);
+  digitalWrite(5, LOW);
+
+  // UART初期化
+  Serial2.begin(115200, SERIAL_8N1, 16, 17);
+
+  // 起動完了メッセージ待ち
+  Serial.println("### MODULE OUTPUT ###");
+  int len, is_echo = 0;
+  for (;;) {
+    len = SipfUtilReadLine(buff, sizeof(buff), 300000); //タイムアウト300秒
+    if (len < 0) {
+      return -1;  //Serialのエラーかタイムアウト
+    }
+    if (len == 1) {
+      //空行なら次の行へ
+      continue;
+    }
+    if (len >= 13) {
+      if (memcmp(buff, "*** SIPF Client", 15) == 0) {
+        is_echo = 1;
+      }
+      //起動完了メッセージを確認
+      if (memcmp(buff, "+++ Ready +++", 13) == 0) {
+        Serial.println("#####################");
+        break;
+      }
+      //接続リトライオーバー
+      if (memcmp(buff, "ERR:Faild", 9) == 0) {
+        Serial.println((char*)buff);
+        Serial.println("#####################");
+        return -1;
+      }
+    }
+    if (is_echo) {
+      Serial.printf("%s\r\n", (char*)buff);
+    }
+  }
+  return 0;
+}
+
 void setup()
 {
   // serial
@@ -57,8 +117,26 @@ void setup()
   // M5Stack
   M5.begin();
   M5.Lcd.setTextSize(2);
+
+  // Sipf初期化
+  M5.Lcd.printf("SipfModule Booting...");
+  if (resetSipfModule() == 0) {
+    M5.Lcd.printf(" OK\n");
+  } else {
+    M5.Lcd.printf(" NG\n");
+    return;
+  }
   
+  M5.Lcd.printf("Setting auth mode...\n");
+  if (SipfSetAuthMode(0x01) == 0) {
+    M5.Lcd.printf(" OK\n");
+  } else {
+    M5.Lcd.printf(" NG\n");
+    return;
+  }
+
   // ESP-NOW初期化
+  M5.Lcd.printf("ESP-NOW Setup...\n");
   WiFi.mode(WIFI_STA);
   WiFi.disconnect();
   if (esp_now_init() == ESP_OK) {
@@ -81,27 +159,61 @@ void setup()
   }
   // ESP-NOWコールバック登録
   esp_now_register_recv_cb(OnDataRecv);
+
+  M5.Lcd.printf("Ready\n");
+  Serial.println("Ready");
 }
 
 void loop()
 {
   M5.update();
-  
-  M5.Lcd.setCursor(0, 0);
-  {
-    int i = 0;
-    for(i = 0;i < DEVICE_NUMBER_MAX;i=i+2)
+
+  if(interval_counter > UPDATE_INTERVAL_MSEC){
+    interval_counter = 0;
+    
+    M5.Lcd.setCursor(0, 0);
     {
-      M5.Lcd.setTextColor(WHITE, BLACK);
-      M5.Lcd.printf("DvNo|    %d    |     %d\n",i+1,i+2);
-      M5.Lcd.printf("----+---------+-----------\n");
-      M5.Lcd.printf("Temp| %02.2fC  | %02.2fC\n",devInfo[i].tmp,devInfo[i+1].tmp);
-      M5.Lcd.printf("Humi| %02.2f%%  | %02.2f%%\n",devInfo[i].humi,devInfo[i+1].humi);
-      M5.Lcd.printf("TVOC|  %4dppb|  %4dppb\n", devInfo[i].tvoc,devInfo[i+1].tvoc);
-      M5.Lcd.printf("eCO2|  %4dppm|  %4dppb\n", devInfo[i].eco2,devInfo[i+1].eco2);
-      M5.Lcd.printf("\n");
+      int i = 0;
+      for(i = 0;i < DEVICE_NUMBER_MAX;i=i+2)
+      {
+        M5.Lcd.setTextColor(WHITE, BLACK);
+        M5.Lcd.printf("DvNo|    %d    |     %d\n",i+1,i+2);
+        M5.Lcd.printf("----+---------+-----------\n");
+        M5.Lcd.printf("Temp| %02.2fC  | %02.2fC\n",devInfo[i].tmp,devInfo[i+1].tmp);
+        M5.Lcd.printf("Humi| %02.2f%%  | %02.2f%%\n",devInfo[i].humi,devInfo[i+1].humi);
+        M5.Lcd.printf("TVOC|  %4dppb|  %4dppb\n", devInfo[i].tvoc,devInfo[i+1].tvoc);
+        M5.Lcd.printf("eCO2|  %4dppm|  %4dppb\n", devInfo[i].eco2,devInfo[i+1].eco2);
+        M5.Lcd.printf("\n");
+      }
+       
+      memset(buff, 0, sizeof(buff));
+      uint8_t test = 2;
+      int ret = SipfCmdTx(0x01, OBJ_TYPE_UINT32, &test, 4, buff);
+      if (ret == 0) {
+        Serial.printf("OK\nOTID: %s\n", buff);
+      } else {
+        Serial.printf("NG: %d\n", ret);
+      }
     }
   }
+
+  interval_counter = interval_counter + 1;
+  delay(1);
+
+  // ----------------------option?
   
-  delay(5000);
+  // put your main code here, to run repeatedly:
+  int available_len;
+  /* PCとモジュールのシリアルポートを中継 */
+  available_len = Serial.available();
+  for (int i = 0; i < available_len; i++) {
+    unsigned char b = Serial.read();
+    Serial2.write(b);
+  }
+
+  available_len = Serial2.available();
+  for (int i = 0; i < available_len; i++) {
+    unsigned char b = Serial2.read();
+    Serial.write(b);
+  }
 }
