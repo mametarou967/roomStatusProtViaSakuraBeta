@@ -1,6 +1,3 @@
-# WebSocketのURI
-uri = "wss://api.sakura.io/ws/v1/cloud/2e11284a-9208-49db-bd27-eaa8949e223e?access_token=2e11284a-9208-49db-bd27-eaa8949e223e"
-
 # ライブラリのインポート
 from websocket import create_connection
 import json
@@ -8,9 +5,10 @@ import ambient
 import datetime
 import time
 import traceback
+import sakuraWebsocketUri
+import ambientConfig
 
 receiveFinalTag = 45
-
 
 class DeviceInfo():
     temp = 0.0
@@ -81,7 +79,7 @@ while True:
 	keepAliveCount = 0
 	
 	try:
-		ws = create_connection(uri)
+		ws = create_connection(sakuraWebsocketUri.uri)
 	except:
 		print("%s:[Exception Occured]" % datetime.datetime.now())
 		traceback.print_exc()
@@ -120,8 +118,9 @@ while True:
 		#send Transaction
 		if receiveFinalTagFlag is True:
 			print("%s:[Send to ambient]" % datetime.datetime.now())
+			
 			#ch1
-			ambi1 = ambient.Ambient(41295, "ca34f6009f3815d9") 
+			ambi1 = ambient.Ambient(ambientConfig.ondoChannel, ambientConfig.ondoWriteKey) 
 			ambi1.send({ 
 				"d1": deviceManager.GetValue(1,1),
 				"d2": deviceManager.GetValue(2,1),
@@ -131,7 +130,7 @@ while True:
 	
 
 			#ch2
-			ambi2 = ambient.Ambient(41721, "2f6ca439ebd734ee") 
+			ambi2 = ambient.Ambient(ambientConfig.shitsudoChannel, ambientConfig.shitsudoWriteKey) 
 			ambi2.send({
 				"d1": deviceManager.GetValue(1,2),
 				"d2": deviceManager.GetValue(2,2),
@@ -140,7 +139,7 @@ while True:
 				})
 			
 			#ch3
-			ambi3 = ambient.Ambient(41722, "2f45be6ae53f990d") 
+			ambi3 = ambient.Ambient(ambientConfig.kiatsuChannel,ambientConfig.kiatsuWriteKey)
 			ambi3.send({
 				"d1": deviceManager.GetValue(1,3),
 				"d2": deviceManager.GetValue(2,3),
@@ -150,7 +149,7 @@ while True:
 				
 			
 			#ch4
-			ambi4 = ambient.Ambient(41723, "72e6538c6206e335") 
+			ambi4 = ambient.Ambient(ambientConfig.tvocChannel, ambientConfig.tvocWriteKey) 
 			ambi4.send({
 				"d1": deviceManager.GetValue(1,4),
 				"d2": deviceManager.GetValue(2,4),
@@ -160,7 +159,7 @@ while True:
 				
 			
 			#ch5
-			ambi5 = ambient.Ambient(41724, "1b66c605f666578d") 
+			ambi5 = ambient.Ambient(ambientConfig.eco2Channel, ambientConfig.eco2WriteKey) 
 			ambi5.send({
 				"d1": deviceManager.GetValue(1,5),
 				"d2": deviceManager.GetValue(2,5),

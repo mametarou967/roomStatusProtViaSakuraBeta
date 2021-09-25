@@ -1,0 +1,10 @@
+ondoChannel = 11111
+ondoWriteKey = "ABCDEFGHIJKLMNOP"
+shitsudoChannel = 22222
+shitsudoWriteKey = "ABCDEFGHIJKLMNOP"
+kiatsuChannel = 33333
+kiatsuWriteKey = "ABCDEFGHIJKLMNOP"
+tvocChannel = 44444
+tvocWriteKey = "ABCDEFGHIJKLMNOP"
+eco2Channel = 55555
+eco2WriteKey = "ABCDEFGHIJKLMNOP"
