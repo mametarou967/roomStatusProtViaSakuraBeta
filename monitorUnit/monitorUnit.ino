@@ -10,7 +10,10 @@ esp_now_peer_info_t slave;
 #define UPDATE_DISP_INTERVAL_MSEC  5000
 #define UPDATE_DATAUPLOAD_INTERVAL_MSEC  60000 // 1分に1回書く
 #define MAX(a,b) ((a)>(b)?(a):(b))
+#define RESET_MIN 60
+#define RESET_COUNT_FOR_INTERVAL  ((RESET_MIN * 60 * 1000) / MAX(UPDATE_DISP_INTERVAL_MSEC,UPDATE_DATAUPLOAD_INTERVAL_MSEC))
 int interval_counter = 1;
+int reset_counter_for_interval = 1;
 
 //device
 #define DEVICE_NUMBER_MIN 1
@@ -191,6 +194,7 @@ static void sendDeviceInfoToSipf()
           Serial.printf("OK\nOTID: %s\n", buff);
         } else {
           Serial.printf("NG: %d\n", ret);
+          M5.Power.reset();
         }
       }
     }
@@ -212,7 +216,7 @@ void setup()
     M5.Lcd.printf(" OK\n");
   } else {
     M5.Lcd.printf(" NG\n");
-    return;
+    M5.Power.reset();
   }
   
   M5.Lcd.printf("Setting auth mode...\n");
@@ -220,7 +224,7 @@ void setup()
     M5.Lcd.printf(" OK\n");
   } else {
     M5.Lcd.printf(" NG\n");
-    return;
+    M5.Power.reset();
   }
 
   // ESP-NOW初期化
@@ -233,7 +237,8 @@ void setup()
   } else {
     Serial.println("ESPNow Init Failed");
     M5.Lcd.print("ESPNow Init Failed\n");
-    ESP.restart();
+    M5.Power.reset();
+    // ESP.restart();
   }
   // マルチキャスト用Slave登録
   memset(&slave, 0, sizeof(slave));
@@ -273,6 +278,11 @@ void loop()
   {
     Serial.printf("reset!! %d", interval_counter);
     interval_counter = 0;
+    reset_counter_for_interval = reset_counter_for_interval + 1;
+    if(reset_counter_for_interval > RESET_COUNT_FOR_INTERVAL){
+      // リセット時間満了 / 6時間程度経つと、送信できなくなるため
+      M5.Power.reset();
+    }
   }
   
   interval_counter = interval_counter + 1;
