@@ -8,3 +8,5 @@ tvocChannel = 44444
 tvocWriteKey = "ABCDEFGHIJKLMNOP"
 eco2Channel = 55555
 eco2WriteKey = "ABCDEFGHIJKLMNOP"
+fukaishisuuChannel = 66666
+fukaishisuuWriteKey = "ABCDEFGHIJKLMNOP"

@@ -7,6 +7,11 @@ import time
 import traceback
 import sakuraWebsocketUri
 import ambientConfig
+import logging
+from logging import getLogger
+formatter = '%(asctime)s:%(message)s'
+logging.basicConfig(format=formatter,filename='log.log',level=logging.DEBUG)
+logger = getLogger(__name__)
 
 receiveFinalTag = 45
 
@@ -69,12 +74,20 @@ class DeviceManager():
         if sensorNumber == 4 : return device.tvoc
         if sensorNumber == 5 : return device.eco2
         return None
+    
+    def GetFukaiShisuuValue(self,deviceNumber):
+        device = self.__GetDevice(deviceNumber)
+        term1 = (0.81 * device.temp)
+        term2 = 0.01 * device.humi * ((0.99 * device.temp) - 14.3)
+        fukaiShisuu =  term1 + term2 + 46.3
+        return fukaiShisuu
         
 deviceManager = DeviceManager()
 
 while True:
 	# WebSocketのURIに接続
 	print("%s:[CONNECT]" % datetime.datetime.now())
+	logger.info('[CONNECT]')
 	receiveFinalTagFlag = False
 	keepAliveCount = 0
 	
@@ -82,8 +95,10 @@ while True:
 		ws = create_connection(sakuraWebsocketUri.uri)
 	except:
 		print("%s:[Exception Occured]" % datetime.datetime.now())
+		logger.error('[Exception Occured]')
 		traceback.print_exc()
 		print("%s:[Wait For Exception]" % datetime.datetime.now())
+		logger.error('[Wait For Exception]')
 		time.sleep(30)
 	
 	while True:
@@ -93,15 +108,18 @@ while True:
 			result = ws.recv()
 		except:
 			print("%s:[Exception Occured]" % datetime.datetime.now())
+			logger.error('[Exception Occured]')
 			traceback.print_exc()
 			break
 		
 		print("%s:Received '%s'" % (datetime.datetime.now(),result))
+		logger.info("Received '%s'" % result)
 		json_dict = json.loads(result)
 		
 		# receive packet transaction
 		if not 'keepalive' in json_dict['type']:
 			print("%s:[Valid Data Receive]" % datetime.datetime.now())
+			logger.info("[Valid Data Receive]")
 			# from device
 			tag = json_dict['payload'][0]['tag']
 			deviceNumber = int(tag) // 10
@@ -109,72 +127,93 @@ while True:
 			deviceManager.Update(deviceNumber,sensorNumber,json_dict['payload'][0]['value'])
 			if int(tag) is receiveFinalTag:
 				print("%s:[receiveFinalTag]" % datetime.datetime.now())
+				logger.info("[receiveFinalTag]")
 				receiveFinalTagFlag = True
 		else:
 			print("%s:[Keep Alive Receive]" % datetime.datetime.now())
+			logger.info("[Keep Alive Receive]")
 			## keepalive
 			keepAliveCount = keepAliveCount + 1
 		
 		#send Transaction
 		if receiveFinalTagFlag is True:
 			print("%s:[Send to ambient]" % datetime.datetime.now())
+			logger.info("[Send to ambient]")
 			
-			#ch1
-			ambi1 = ambient.Ambient(ambientConfig.ondoChannel, ambientConfig.ondoWriteKey) 
-			ambi1.send({ 
-				"d1": deviceManager.GetValue(1,1),
-				"d2": deviceManager.GetValue(2,1),
-				"d3": deviceManager.GetValue(3,1),
-				"d4": deviceManager.GetValue(4,1),
-				})
-	
+			
+			try:
+                #ch1
+				ambi1 = ambient.Ambient(ambientConfig.ondoChannel, ambientConfig.ondoWriteKey) 
+				ambi1.send({ 
+					"d1": deviceManager.GetValue(1,1),
+					"d2": deviceManager.GetValue(2,1),
+					"d3": deviceManager.GetValue(3,1),
+					"d4": deviceManager.GetValue(4,1),
+					})
+        
 
-			#ch2
-			ambi2 = ambient.Ambient(ambientConfig.shitsudoChannel, ambientConfig.shitsudoWriteKey) 
-			ambi2.send({
-				"d1": deviceManager.GetValue(1,2),
-				"d2": deviceManager.GetValue(2,2),
-				"d3": deviceManager.GetValue(3,2),
-				"d4": deviceManager.GetValue(4,2),
-				})
-			
-			#ch3
-			ambi3 = ambient.Ambient(ambientConfig.kiatsuChannel,ambientConfig.kiatsuWriteKey)
-			ambi3.send({
-				"d1": deviceManager.GetValue(1,3),
-				"d2": deviceManager.GetValue(2,3),
-				"d3": deviceManager.GetValue(3,3),
-				"d4": deviceManager.GetValue(4,3),
-				})
-				
-			
-			#ch4
-			ambi4 = ambient.Ambient(ambientConfig.tvocChannel, ambientConfig.tvocWriteKey) 
-			ambi4.send({
-				"d1": deviceManager.GetValue(1,4),
-				"d2": deviceManager.GetValue(2,4),
-				"d3": deviceManager.GetValue(3,4),
-				"d4": deviceManager.GetValue(4,4),
-				})
-				
-			
-			#ch5
-			ambi5 = ambient.Ambient(ambientConfig.eco2Channel, ambientConfig.eco2WriteKey) 
-			ambi5.send({
-				"d1": deviceManager.GetValue(1,5),
-				"d2": deviceManager.GetValue(2,5),
-				"d3": deviceManager.GetValue(3,5),
-				"d4": deviceManager.GetValue(4,5),
-				})
+                #ch2
+				ambi2 = ambient.Ambient(ambientConfig.shitsudoChannel, ambientConfig.shitsudoWriteKey) 
+				ambi2.send({
+					"d1": deviceManager.GetValue(1,2),
+					"d2": deviceManager.GetValue(2,2),
+					"d3": deviceManager.GetValue(3,2),
+					"d4": deviceManager.GetValue(4,2),
+					})
+                
+                #ch3
+				ambi3 = ambient.Ambient(ambientConfig.kiatsuChannel,ambientConfig.kiatsuWriteKey)
+				ambi3.send({
+					"d1": deviceManager.GetValue(1,3),
+					"d2": deviceManager.GetValue(2,3),
+					"d3": deviceManager.GetValue(3,3),
+					"d4": deviceManager.GetValue(4,3),
+					})
+                    
+                
+                #ch4
+				ambi4 = ambient.Ambient(ambientConfig.tvocChannel, ambientConfig.tvocWriteKey) 
+				ambi4.send({
+					"d1": deviceManager.GetValue(1,4),
+					"d2": deviceManager.GetValue(2,4),
+					"d3": deviceManager.GetValue(3,4),
+					"d4": deviceManager.GetValue(4,4),
+					})
+                    
+                
+                #ch5
+				ambi5 = ambient.Ambient(ambientConfig.eco2Channel, ambientConfig.eco2WriteKey) 
+				ambi5.send({
+					"d1": deviceManager.GetValue(1,5),
+					"d2": deviceManager.GetValue(2,5),
+					"d3": deviceManager.GetValue(3,5),
+					"d4": deviceManager.GetValue(4,5),
+					})
+                
+                #ch6
+				ambi6 = ambient.Ambient(ambientConfig.fukaishisuuChannel, ambientConfig.fukaishisuuWriteKey)
+				ambi6.send({
+					"d1": deviceManager.GetFukaiShisuuValue(1),
+					"d2": deviceManager.GetFukaiShisuuValue(2),
+					"d3": deviceManager.GetFukaiShisuuValue(3),
+					"d4": deviceManager.GetFukaiShisuuValue(4),
+					})
+			except:
+				print("%s:[Exception Occured]" % datetime.datetime.now())
+				logger.error('[Exception Occured]')
+				traceback.print_exc()
 		
 		#terminate condition
 		if receiveFinalTagFlag is True:
 			print("%s:[receiveFinalTagFlag is True -> ws close]" % datetime.datetime.now())
+			logger.info("[receiveFinalTagFlag is True -> ws close]")
 			break
 		
 		if keepAliveCount > 20:
 			print("%s:[keepAliveCount is over -> ws close]" % datetime.datetime.now())
+			logger.info("[keepAliveCount is over -> ws close]")
 			break;
 
 	print("%s:[CLOSE]" % datetime.datetime.now())
+	logger.info("[CLOSE]")
 	ws.close()
