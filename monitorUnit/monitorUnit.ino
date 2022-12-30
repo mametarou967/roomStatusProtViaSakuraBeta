@@ -255,6 +255,7 @@ void setup()
 
   M5.Lcd.printf("Ready\n");
   Serial.println("Ready");
+  M5.Lcd.clear(); // 画面全体を消去
 }
 
 void loop()
